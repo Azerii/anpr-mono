@@ -51,12 +51,6 @@
 
 [![API docs](img/docs.png)](https://github.com/tiangolo/full-stack-fastapi-template)
 
-## How To Use It
-
-You can **just fork or clone** this repository and use it as is.
-
-✨ It just works. ✨
-
 ### How to Use a Private Repository
 
 If you want to have a private repository, GitHub won't allow you to simply fork it as it doesn't allow changing the visibility of forks.
