@@ -65,6 +65,18 @@ export const $ItemCreate = {
 	type: 'null',
 }],
 },
+		plate_number: {
+	type: 'string',
+	isRequired: true,
+},
+		tally_number: {
+	type: 'number',
+	isRequired: true,
+},
+		timestamp: {
+	type: 'string',
+	isRequired: true,
+},
 	},
 } as const;
 
@@ -81,6 +93,18 @@ export const $ItemPublic = {
 }, {
 	type: 'null',
 }],
+},
+		plate_number: {
+	type: 'string',
+	isRequired: true,
+},
+		tally_number: {
+	type: 'number',
+	isRequired: true,
+},
+		timestamp: {
+	type: 'string',
+	isRequired: true,
 },
 		id: {
 	type: 'number',
@@ -110,6 +134,18 @@ export const $ItemUpdate = {
 }, {
 	type: 'null',
 }],
+},
+		plate_number: {
+	type: 'string',
+	isRequired: true,
+},
+		tally_number: {
+	type: 'number',
+	isRequired: true,
+},
+		timestamp: {
+	type: 'string',
+	isRequired: true,
 },
 	},
 } as const;

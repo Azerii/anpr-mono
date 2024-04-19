@@ -61,22 +61,30 @@ class UsersPublic(SQLModel):
 class ItemBase(SQLModel):
     title: str
     description: str | None = None
+    plate_number: str
+    tally_number: int
+    timestamp: str
 
 
 # Properties to receive on item creation
 class ItemCreate(ItemBase):
     title: str
+    plate_number: str
 
 
 # Properties to receive on item update
 class ItemUpdate(ItemBase):
     title: str | None = None  # type: ignore
+    plate_number: str
 
 
 # Database model, database table inferred from class name
 class Item(ItemBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    title: str
+    plate_number: str | None = Field(default=None, nullable=False)
+    tally_number: int | None = Field(default=None, nullable=True)
+    timestamp: str | None = Field(default=None, nullable=False)
+    title: str | None
     owner_id: int | None = Field(default=None, foreign_key="user.id", nullable=False)
     owner: User | None = Relationship(back_populates="items")
 

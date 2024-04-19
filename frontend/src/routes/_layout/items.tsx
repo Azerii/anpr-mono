@@ -35,10 +35,10 @@ function ItemsTableBody() {
       {items.data.map((item) => (
         <Tr key={item.id}>
           <Td>{item.id}</Td>
-          <Td>{item.title}</Td>
-          <Td color={!item.description ? "ui.dim" : "inherit"}>
-            {item.description || "N/A"}
-          </Td>
+          <Td>{item.plate_number}</Td>
+          <Td>{item.tally_number}</Td>
+          <Td>{new Date(item.timestamp).toLocaleDateString()}</Td>
+          <Td>{new Date(item.timestamp).toLocaleTimeString()}</Td>
           <Td>
             <ActionsMenu type={"Item"} value={item} />
           </Td>
@@ -54,8 +54,9 @@ function ItemsTable() {
         <Thead>
           <Tr>
             <Th>ID</Th>
-            <Th>Title</Th>
-            <Th>Description</Th>
+            <Th>Plate number</Th>
+            <Th>Tally number</Th>
+            <Th>Date</Th>
             <Th>Actions</Th>
           </Tr>
         </Thead>
@@ -63,7 +64,7 @@ function ItemsTable() {
           fallbackRender={({ error }) => (
             <Tbody>
               <Tr>
-                <Td colSpan={4}>Something went wrong: {error.message}</Td>
+                <Td colSpan={5}>Something went wrong: {error.message}</Td>
               </Tr>
             </Tbody>
           )}
@@ -73,7 +74,7 @@ function ItemsTable() {
               <Tbody>
                 {new Array(5).fill(null).map((_, index) => (
                   <Tr key={index}>
-                    {new Array(4).fill(null).map((_, index) => (
+                    {new Array(5).fill(null).map((_, index) => (
                       <Td key={index}>
                         <Flex>
                           <Skeleton height="20px" width="20px" />
@@ -97,7 +98,7 @@ function Items() {
   return (
     <Container maxW="full">
       <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
-        Items Management
+        Plate Entries Management
       </Heading>
 
       <Navbar type={"Item"} />
