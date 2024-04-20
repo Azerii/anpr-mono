@@ -1,10 +1,12 @@
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
+from threading import Thread
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.api.detection.main import LicensePlateRecognition
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -31,5 +33,13 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+@app.websocket("/detection")
+async def get_detections(websocket: WebSocket):
+    await websocket.accept()
+    recognition = LicensePlateRecognition(websocket)
+    thread = Thread(target=(await recognition.main()))
+    thread.start()
+    # await recognition.main()
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router"
 
 import type { UserPublic } from "../../client"
 import sampleVideo from "../../assets/sample3.mp4"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
@@ -30,6 +30,39 @@ function Dashboard() {
 
   const currentUser = queryClient.getQueryData<UserPublic>(["currentUser"])
   const [plateNumber, setPlateNumber] = useState("")
+  // const [ws, setWs] = useState({});
+  const [frame, setFrame] = useState(null);
+  const [detections, setDetections] = useState<Array<string>>([]);
+
+  useEffect(() => {
+      const ws = new WebSocket('ws://localhost/detection');
+      // setWs(ws);
+
+      ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          setFrame(data.frame);
+          if (data.detection) {
+            setDetections((curr) => {
+              const temp = [...curr];
+              temp.push(data.detection as string)
+              return temp.slice(-15)
+            });
+          }
+      };
+
+      ws.onerror = (error) => {
+        console.log(JSON.stringify(error, null, 2))
+      }
+
+      // return () => ws.close();
+  }, []);
+
+  const handleSave = async () => {
+    // TODO: make sure to format to uppercase before saving
+    // to db.
+    console.log(plateNumber.toUpperCase())
+    setPlateNumber("")
+  }
 
   return (
     <>
@@ -49,9 +82,9 @@ function Dashboard() {
             overflow='hidden'
             variant='outline'
           >
-            <Grid templateColumns="560px auto" gap={6}>
-              <AspectRatio width='560px' ratio={4 / 3}>
-                <video src={sampleVideo} loop autoPlay muted onContextMenu={(e) => e.preventDefault()}></video>
+            <Grid templateColumns="600px auto" gap={6}>
+              <AspectRatio width='600px' ratio={4 / 3}>
+                <img src={frame ? `data:image/jpeg;base64,${frame}` : 'https://placehold.co/600x400?text=Feed+Unavailable'} alt="Feed" onContextMenu={(e) => e.preventDefault()} />
               </AspectRatio>
 
               <Stack>
@@ -61,7 +94,7 @@ function Dashboard() {
                     Select a detection to save or input plate number if no detection is correct or found
                   </Text>
                   <Stack direction='row' wrap="wrap" spacing={4} align='center'>
-                    {TEMP.map(item => (
+                    {detections.map(item => (
                       <Button colorScheme={item === plateNumber ? 'green' : 'gray'} onClick={() => setPlateNumber(item)}>{item}</Button>
                     ))}
                   </Stack>
@@ -74,7 +107,7 @@ function Dashboard() {
                   </FormControl>
                 </CardBody>
                 <CardFooter>
-                  <Button variant='solid' colorScheme='blue'>
+                  <Button variant='solid' colorScheme='blue' onClick={handleSave} disabled={true}>
                     Save plate number
                   </Button>
                 </CardFooter>
