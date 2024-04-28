@@ -3,6 +3,7 @@ import {
   Flex,
   Heading,
   Skeleton,
+  Spacer,
   Table,
   TableContainer,
   Tbody,
@@ -44,6 +45,36 @@ function ItemsTableBody() {
           </Td>
         </Tr>
       ))}
+      <Tr>
+          <Td>1</Td>
+          <Td>MUS711BU</Td>
+          <Td>0001</Td>
+          <Td>4/18/2024</Td>
+          <Td>2:20:03 PM</Td>
+          <Td>
+            :
+          </Td>
+        </Tr>
+      <Tr>
+          <Td>2</Td>
+          <Td>GWA866DC</Td>
+          <Td>0002</Td>
+          <Td>4/18/2024</Td>
+          <Td>2:22:41 PM</Td>
+          <Td>
+            :
+          </Td>
+        </Tr>
+        <Tr>
+          <Td>3</Td>
+          <Td>LG8319AA</Td>
+          <Td>0003</Td>
+          <Td>4/20/2024</Td>
+          <Td>6:59:56 AM</Td>
+          <Td>
+            :
+          </Td>
+        </Tr>
     </Tbody>
   )
 }
@@ -57,6 +88,7 @@ function ItemsTable() {
             <Th>Plate number</Th>
             <Th>Tally number</Th>
             <Th>Date</Th>
+            <Th>Time</Th>
             <Th>Actions</Th>
           </Tr>
         </Thead>
@@ -98,10 +130,11 @@ function Items() {
   return (
     <Container maxW="full">
       <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
-        Plate Entries Management
+        Plate Number Entries
       </Heading>
 
-      <Navbar type={"Item"} />
+      {/* <Navbar type={"Item"} /> */}
+      <Spacer height={12} />
       <ItemsTable />
     </Container>
   )

@@ -1,8 +1,8 @@
+import asyncio
 import sentry_sdk
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
-from threading import Thread
 
 from app.api.main import api_router
 from app.core.config import settings
@@ -34,12 +34,18 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
 @app.websocket("/detection")
 async def get_detections(websocket: WebSocket):
     await websocket.accept()
-    recognition = LicensePlateRecognition(websocket)
-    thread = Thread(target=(await recognition.main()))
-    thread.start()
-    # await recognition.main()
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
+    queue = asyncio.Queue(maxsize=10)
+    recognition = LicensePlateRecognition(websocket)
+    detect_task = asyncio.create_task(recognition.detect(queue))
+
+    try:
+        while True:
+            await recognition.receive(queue)
+    except WebSocketDisconnect:
+        detect_task.cancel()
