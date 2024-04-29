@@ -105,13 +105,11 @@ class LicensePlateRecognition:
 
                 detections = self.license_plate_detector(self.latest_frame, verbose=False)[0]
 
-                print(detections.boxes.data.tolist())
-
                 frame = self.latest_frame
                 self.detections = []
 
                 for detection in detections.boxes.data.tolist():
-                    x1, y1, x2, y2, score, class_id = detection
+                    x1, y1, x2, y2, detection_score, class_id = detection
 
                     self.detections.append([x1, y1, x2, y2, class_id])
                     try:
@@ -139,6 +137,11 @@ class LicensePlateRecognition:
                         # Send data (frame and detections) as JSON to the frontend via websocket
                         encoded_frame = cv2.imencode('.jpg', frame)[1].tobytes()
                         base64_encoded_frame = base64.b64encode(encoded_frame).decode('utf-8')
-                        await self.websocket.send_json({ "frame": base64_encoded_frame, "detection": license_plate_text, "score": license_plate_text_score })
+                        await self.websocket.send_json({ 
+                            "frame": base64_encoded_frame,
+                            "detectionScore": detection_score,
+                            "text": license_plate_text,
+                            "recognitionScore": license_plate_text_score 
+                        })
             except:
                 self.running = False

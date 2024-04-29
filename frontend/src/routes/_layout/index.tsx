@@ -3,27 +3,12 @@ import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 
 import { useCallback, useEffect, useState } from "react"
-import sampleVideo from "../../assets/sample3.mp4"
+import sampleVideo from "../../assets/sample2.mp4"
 import type { UserPublic } from "../../client"
 
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
 })
-
-const TEMP = 
-  ["LSQ5ASH",
-  // "IG497OI",
-  // "LC63K9I",
-  // "LE53IQ2",
-  // "LE53I8S",
-  "LG83A98",
-  "LGE3I9A",
-  "LE83ISA",
-  "LG53I9I",
-  "LG43I9I",
-  "IG55I9I",
-  "LE83I9A"
-]
 
 function Dashboard() {
   const queryClient = useQueryClient()
@@ -32,7 +17,7 @@ function Dashboard() {
   const [ws, setWs] = useState<WebSocket>();
   const [plateNumber, setPlateNumber] = useState("");
   const [frame, setFrame] = useState(null);
-  const [detections, setDetections] = useState<Array<string>>(TEMP);
+  const [detections, setDetections] = useState<Array<any>>([]);
   const [mediaDevices, setMediaDevices] = useState<Array<MediaDeviceInfo>>();
   const [deviceId, setDeviceId] = useState("");
   const [detecting, setDetecting] = useState(false);
@@ -42,6 +27,7 @@ function Dashboard() {
     // to db.
     console.log(plateNumber.toUpperCase())
     setPlateNumber("")
+    setDetections([])
   }
 
   const IMAGE_INTERVAL_MS = 1500;
@@ -54,64 +40,64 @@ function Dashboard() {
     socket.addEventListener('open', function () {
       setDetecting(true)
       // Start reading video from device
-      // navigator.mediaDevices.getUserMedia({
-      //   audio: false,
-      //   video: {
-      //     deviceId,
-      //     width: { max: 600 },
-      //     height: { max: 460 },
-      //   },
-      // }).then(function (stream) {
-      //   video.srcObject = stream;
-      //   video.play().then(() => {
-      //     // Adapt overlay canvas size to the video size
-      //     canvas.width = video.videoWidth;
-      //     canvas.height = video.videoHeight;
-
-      //     // Send an image in the WebSocket every 500 ms
-      //     intervalId = setInterval(() => {
-
-      //       // Create a virtual canvas to draw current video image
-      //       const canvas = document.createElement('canvas');
-      //       const ctx = canvas.getContext('2d');
-      //       canvas.width = video.videoWidth;
-      //       canvas.height = video.videoHeight;
-      //       ctx?.drawImage(video, 0, 0);
-
-      //       // Convert it to JPEG and send it to the WebSocket
-      //       canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
-      //     }, IMAGE_INTERVAL_MS);
-      //   });
-      // });
-      video.play().then(() => {
-        // Adapt overlay canvas size to the video size
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        // Send an image in the WebSocket every 500 ms
-        intervalId = setInterval(() => {
-
-          // Create a virtual canvas to draw current video image
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+      navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          deviceId,
+          width: { max: 600 },
+          height: { max: 460 },
+        },
+      }).then(function (stream) {
+        video.srcObject = stream;
+        video.play().then(() => {
+          // Adapt overlay canvas size to the video size
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
-          ctx?.drawImage(video, 0, 0);
 
-          // Convert it to JPEG and send it to the WebSocket
-          canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
-        }, IMAGE_INTERVAL_MS);
+          // Send an image in the WebSocket every 500 ms
+          intervalId = setInterval(() => {
+
+            // Create a virtual canvas to draw current video image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx?.drawImage(video, 0, 0);
+
+            // Convert it to JPEG and send it to the WebSocket
+            canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
+          }, IMAGE_INTERVAL_MS);
+        });
       });
+      // video.play().then(() => {
+      //   // Adapt overlay canvas size to the video size
+      //   canvas.width = video.videoWidth;
+      //   canvas.height = video.videoHeight;
+
+      //   // Send an image in the WebSocket every 500 ms
+      //   intervalId = setInterval(() => {
+
+      //     // Create a virtual canvas to draw current video image
+      //     const canvas = document.createElement('canvas');
+      //     const ctx = canvas.getContext('2d');
+      //     canvas.width = video.videoWidth;
+      //     canvas.height = video.videoHeight;
+      //     ctx?.drawImage(video, 0, 0);
+
+      //     // Convert it to JPEG and send it to the WebSocket
+      //     canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
+      //   }, IMAGE_INTERVAL_MS);
+      // });
     });
 
     // Listen for messages
     socket.addEventListener('message', function (event) {
       const data = JSON.parse(event.data);
-      console.log("detection", data.detection)
-        if (data.detection) {
+      console.log("detection", data.text)
+        if (data.text) {
           setDetections((curr) => {
             const temp = [...curr];
-            temp.push(data.detection as string)
+            temp.push(data)
             return temp.slice(-15)
           });
         }
@@ -179,7 +165,7 @@ function Dashboard() {
                   <AspectRatio width='600px' ratio={4/3}>
                     <video
                       id="video"
-                      src={sampleVideo}
+                      // src={sampleVideo}
                       poster="https://placehold.co/600x400?text=Feed+Unavailable"
                       onContextMenu={(e) => e.preventDefault()}
                       loop muted autoPlay
@@ -214,8 +200,10 @@ function Dashboard() {
                   </Text>
                   <Stack direction='row' wrap="wrap" spacing={4} align='center'>
                     {detections.map((item, index) => (
-                      <Button key={index} colorScheme={item === plateNumber ? 'green' : 'gray'} onClick={() => setPlateNumber(item)}>
-                        {item}
+                      <Button key={index} display="flex" flexDirection="row" gap={2} colorScheme={item === plateNumber ? 'green' : 'gray'} onClick={() => setPlateNumber(item.text)}>
+                        <Text>{item.text}</Text>
+                        <Text>D={Number(item.detectionScore).toFixed(2)}</Text>
+                        <Text>R={Number(item.recognitionScore).toFixed(2)}</Text>
                       </Button>
                     ))}
                   </Stack>
