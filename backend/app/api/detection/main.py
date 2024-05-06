@@ -2,9 +2,7 @@ import asyncio
 import base64
 import time
 import os
-from threading import Thread
 
-from fastapi.websockets import WebSocketState
 import numpy as np
 from ultralytics import YOLO
 import cv2
@@ -36,12 +34,8 @@ class LicensePlateRecognition:
         self.license_plate_detector = YOLO(os.path.abspath('C:/Users/User A/csc/anpr-new/license_plate_detector.pt'), task='detect')
 
         # variables for display
-        self.vid_stream = cv2.VideoCapture(0)
-        self.main_frame = "License Plate Recognition"
-
-        # self.eligible_vehicles = [2, 3, 5, 7]
-        self.detections = []
         self.latest_frame = None
+        self.running = False
 
         # Variables for image collection and processing
         self.plate_image = None
@@ -51,36 +45,6 @@ class LicensePlateRecognition:
 
         # Variables for logging and benchmarking
         self.last_time = time.time()
-        self.running = True
-
-    async def video_stream(self):
-        while self.running:
-            try:
-                # print(type(self.vid_stream))
-                ret, frame = self.vid_stream.read()
-
-                if not ret or not self.websocket.client_state == WebSocketState.CONNECTED:
-                    self.running = False
-                    break
-
-                # print(type(frame))
-                self.latest_frame = frame.copy()
-
-                frame = cv2.resize(frame, (int(1280*.8), int(720*.8)))
-                encoded_frame = cv2.imencode('.jpg', frame)[1].tobytes()
-                base64_encoded_frame = base64.b64encode(encoded_frame).decode('utf-8')
-
-                print(self.websocket.client_state)
-                await self.websocket.send_json({"frame": base64_encoded_frame})
-            except Exception as e:
-                print("error: ", e)
-                print("Video stream ended")
-                self.running = False
-                self.vid_stream.release()
-
-        print("Video stream ended")
-        self.running = False
-        self.vid_stream.release()
         
     async def receive(self, queue: asyncio.Queue):
         """
@@ -93,10 +57,72 @@ class LicensePlateRecognition:
         except asyncio.QueueFull:
             pass
 
+    def preprocess(self, img):
+        #Convert from colored to Grayscale.
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        #Applying Bilateral Filter on the grayscale image.
+        '''Bilateral Filter : A bilateral filter is a non-linear, edge-preserving,
+        and noise-reducing smoothing filter for images.
+        It replaces the intensity of each pixel with a weighted average of intensity values from nearby pixels.'''
+        #It will remove noise while preserving the edges. So, the number plate remains distinct.
+        denoised_img = cv2.fastNlMeansDenoising(gray_img)
+        filtered_img = cv2.bilateralFilter(denoised_img, 9, 15, 15)
+
+        '''Canny Edge detector : The Process of Canny edge detection algorithm can be broken down to 5 different steps:
+
+        1. Apply Gaussian filter to smooth the image in order to remove the noise
+        2. Find the intensity gradients of the image
+        3. Apply non-maximum suppression to get rid of spurious response to edge detection
+        4. Apply double threshold to determine potential edges
+        5. Track edge by hysteresis: Finalize the detection of edges by suppressing all the other edges that are weak and not connected to strong edges.'''
+        #Finding edges of the grayscale image.
+        c_edge = cv2.Canny(filtered_img, 170, 200)
+
+        #Finding contours based on edges detected.
+        cnt, new = cv2.findContours(c_edge, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        #Storing the top 30 edges based on priority
+        cnt = sorted(cnt, key = cv2.contourArea, reverse = True)[:30]
+
+        NumberPlateContours = []
+
+        im2 = img.copy()
+        cv2.drawContours(im2, cnt, -1, (0,255,0), 3)
+
+        for c in cnt:
+            # Get the bounding rectangle
+            x, y, w, h = cv2.boundingRect(c)
+        
+            # Calculate aspect ratio
+            aspect_ratio = float(w)/h 
+
+            # The aspect ratio of a typical Nigerian number plate is about 2:1
+            if aspect_ratio > 1.5 and aspect_ratio < 2.5:
+                NumberPlateContours.append(c)
+
+        '''A picture can be stored as a numpy array. Thus to mask the unwanted portions of the
+        picture, we simply convert it to a zeros array.'''
+        #Masking all other parts, other than the number plate.
+        masked = np.zeros(filtered_img.shape,np.uint8)
+        new_image = cv2.drawContours(masked,NumberPlateContours,0,255,-1)
+        new_image = cv2.bitwise_and(filtered_img,filtered_img,mask=masked)
+
+        # Enhanced contrast for clarity
+        new_image = cv2.equalizeHist(new_image)
+
+        # Apply adaptive thresholding since the image can have varying illumination
+        # gray_img = cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY)
+        # new_image = cv2.adaptiveThreshold(np.array(new_image,dtype=np.uint8),255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+        # threshed_img = cv2.threshold(new_image,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+        final_img = cv2.threshold(new_image,90,255,cv2.THRESH_BINARY)[1]
+
+        return final_img
+
     async def detect(self, queue: asyncio.Queue):
         """
         This is used to handle detection and recognition
         """
+        self.running = True
         while self.running:
             try:
                 bytes = await queue.get()
@@ -106,42 +132,55 @@ class LicensePlateRecognition:
                 detections = self.license_plate_detector(self.latest_frame, verbose=False)[0]
 
                 frame = self.latest_frame
-                self.detections = []
 
                 for detection in detections.boxes.data.tolist():
                     x1, y1, x2, y2, detection_score, class_id = detection
 
-                    self.detections.append([x1, y1, x2, y2, class_id])
+                    # try:
+                    #     car_image = frame[int(y1 - self.image_size_up):int(y2 + self.image_size_up),
+                    #                         int(x1 - self.image_size_up):int(x2 + self.image_size_up)]
+                    # except Exception as e:
+                    #     print(f"Exception: {e}")
+                    #     car_image = frame[int(y1 - self.image_size_up/2):int(y2 + self.image_size_up/2),
+                    #                         int(x1 - self.image_size_up/2):int(x2 + self.image_size_up/2)]
                     try:
-                        plate_image = frame[int(y1 - self.image_size_up):int(y2 + self.image_size_up),
-                                            int(x1 - self.image_size_up):int(x2 + self.image_size_up)]
+                        car_image = frame[int(y1):int(y2), int(x1):int(x2)]
                     except Exception as e:
                         print(f"Exception: {e}")
-                        plate_image = frame[int(y1 - self.image_size_up/2):int(y2 + self.image_size_up/2),
+                        car_image = frame[int(y1 - self.image_size_up/2):int(y2 + self.image_size_up/2),
                                             int(x1 - self.image_size_up/2):int(x2 + self.image_size_up/2)]
-
-                    if not plate_image.any():
+                    
+                    # print("plate image has content? ", plate_image.any())
+                    if not car_image.any():
                         continue
 
                     # process license plate
-                    plate_img = cv2.cvtColor(plate_image, cv2.COLOR_BGR2GRAY)
-                    # _, plate_img = cv2.threshold(plate_img, 64, 255, cv2.THRESH_BINARY_INV)
-                    plate_img = cv2.equalizeHist(plate_img)
-                    # plate_image = cv2.threshold(plate_image, 90, 255, cv2.THRESH_BINARY)[1]
-                    plate_img = cv2.adaptiveThreshold(plate_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                    gray_img = cv2.cvtColor(car_image, cv2.COLOR_BGR2GRAY)
+                    denoised_img = cv2.fastNlMeansDenoising(gray_img)
+                    filtered_img = cv2.bilateralFilter(denoised_img, 9, 15, 15)
+                    plate_image = cv2.equalizeHist(filtered_img)
+                    # plate_image = cv2.adaptiveThreshold(plate_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                    plate_image = cv2.threshold(plate_image,90,255,cv2.THRESH_BINARY)[1]
+                    # plate_image = self.preprocess(frame)
 
                     # read license plate number
-                    license_plate_text, license_plate_text_score = read_license_plate(plate_img)
+                    license_plate_text, license_plate_text_score = read_license_plate(plate_image)
 
                     if license_plate_text is not None:
                         # Send data (frame and detections) as JSON to the frontend via websocket
-                        encoded_frame = cv2.imencode('.jpg', frame)[1].tobytes()
-                        base64_encoded_frame = base64.b64encode(encoded_frame).decode('utf-8')
-                        await self.websocket.send_json({ 
-                            "frame": base64_encoded_frame,
+                        encoded_car_frame = cv2.imencode('.jpg', car_image)[1].tobytes()
+                        encoded_plate_frame = cv2.imencode('.jpg', plate_image)[1].tobytes()
+
+                        base64_encoded_car_frame = base64.b64encode(encoded_car_frame).decode('utf-8')
+                        base64_encoded_plate_frame = base64.b64encode(encoded_plate_frame).decode('utf-8')
+
+                        await self.websocket.send_json({
+                            "carImage": base64_encoded_car_frame,
+                            "plateImage": base64_encoded_plate_frame,
                             "detectionScore": detection_score,
                             "text": license_plate_text,
                             "recognitionScore": license_plate_text_score 
                         })
-            except:
+            except Exception as e:
+                print(f"An error occurred on processing car image. Exception: {e}")
                 self.running = False

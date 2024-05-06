@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 
 import { useCallback, useEffect, useState } from "react"
-import sampleVideo from "../../assets/sample2.mp4"
+import sampleVideo from "../../assets/sample4.mp4"
 import type { UserPublic } from "../../client"
 
 export const Route = createFileRoute("/_layout/")({
@@ -30,7 +30,7 @@ function Dashboard() {
     setDetections([])
   }
 
-  const IMAGE_INTERVAL_MS = 1500;
+  const IMAGE_INTERVAL_MS = 2000;
 
   const startDetection = (video: HTMLVideoElement, canvas: HTMLCanvasElement, deviceId: string) => {
     const socket = new WebSocket('ws://localhost/detection');
@@ -48,42 +48,43 @@ function Dashboard() {
           height: { max: 460 },
         },
       }).then(function (stream) {
-        video.srcObject = stream;
-        video.play().then(() => {
-          // Adapt overlay canvas size to the video size
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-
-          // Send an image in the WebSocket every 500 ms
-          intervalId = setInterval(() => {
-
-            // Create a virtual canvas to draw current video image
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+          video.srcObject = stream;
+          video.play().then(() => {
+            // Adapt overlay canvas size to the video size
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            ctx?.drawImage(video, 0, 0);
 
-            // Convert it to JPEG and send it to the WebSocket
-            canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
-          }, IMAGE_INTERVAL_MS);
-        });
+            // Send an image in the WebSocket every 1000 ms
+            intervalId = setInterval(() => {
+
+              // Create a virtual canvas to draw current video image
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              ctx?.drawImage(video, 0, 0);
+
+              // Convert it to JPEG and send it to the WebSocket
+              canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
+            }, IMAGE_INTERVAL_MS);
+          });
       });
+
       // video.play().then(() => {
       //   // Adapt overlay canvas size to the video size
       //   canvas.width = video.videoWidth;
       //   canvas.height = video.videoHeight;
-
-      //   // Send an image in the WebSocket every 500 ms
+  
+      //   // Send an image in the WebSocket every 1000 ms
       //   intervalId = setInterval(() => {
-
+  
       //     // Create a virtual canvas to draw current video image
       //     const canvas = document.createElement('canvas');
       //     const ctx = canvas.getContext('2d');
       //     canvas.width = video.videoWidth;
       //     canvas.height = video.videoHeight;
       //     ctx?.drawImage(video, 0, 0);
-
+  
       //     // Convert it to JPEG and send it to the WebSocket
       //     canvas.toBlob((blob) => socket.send(blob!), 'image/jpeg');
       //   }, IMAGE_INTERVAL_MS);
@@ -93,14 +94,13 @@ function Dashboard() {
     // Listen for messages
     socket.addEventListener('message', function (event) {
       const data = JSON.parse(event.data);
-      console.log("detection", data.text)
-        if (data.text) {
-          setDetections((curr) => {
-            const temp = [...curr];
-            temp.push(data)
-            return temp.slice(-15)
-          });
-        }
+      if (data.text) {
+        setDetections((curr) => {
+          const temp = [...curr];
+          temp.push(data)
+          return temp.slice(-8)
+        });
+      }
     });
 
     // Stop the interval and video reading on close
@@ -149,20 +149,32 @@ function Dashboard() {
   return (
     <>
       <Container maxW="full">
-        <Box pt={12} m={4}>
+        <Box mt={4} maxH='100vh' overflow='auto' pos='relative'>
           {/* Camera preview */}
           <Spacer height={12} />
-          <Heading size='lg'>Video Feed</Heading>
+          <Heading size='lg'>Live Monitoring</Heading>
           <Spacer height={3} />
-          <Card
-            direction={{ base: 'column', sm: 'row' }}
-            overflow='hidden'
-            variant='outline'
-          >
-            <Grid templateColumns="600px auto" gap={6}>
-              <Stack>
-                <Box  position="relative">
-                  <AspectRatio width='600px' ratio={4/3}>
+          <Grid templateColumns='1fr 2fr' gap={6}>
+            {/* Select media device and start */}
+            <Box pos='sticky' top={3}>
+              <Stack direction="row" gap={3} py={3}>
+                <Select placeholder='Camera device'>
+                  {mediaDevices?.filter(device => device.kind === 'videoinput' && device.deviceId).map((device, index) => {
+                    const id = device.deviceId
+                    return (
+                      <option key={id} value={id}>
+                        {device.label || `Camera ${index}`}
+                      </option>
+                    )
+                  })}
+                </Select>
+                <Button colorScheme={!detecting ? "green" : "red"} onClick={!detecting ? handleStartup : handleStopDetection} width="100%">
+                  {!detecting ? "Start Detection" : "STOP"}
+                </Button>
+              </Stack>
+              <Stack py={3}>
+                <Box position="relative">
+                  <AspectRatio width='100%' ratio={4 / 3}>
                     <video
                       id="video"
                       // src={sampleVideo}
@@ -173,57 +185,55 @@ function Dashboard() {
                   </AspectRatio>
                   <canvas id="canvas" style={{ position: "absolute", top: 0, left: 0 }}></canvas>
                 </Box>
-                
-                {/* Select media device and start */}
-                <Stack direction="row" gap={3} width={600} p={3}>
-                  {/* <Select placeholder='Select camera device'>
-                    {mediaDevices?.filter(device => device.kind === 'videoinput' && device.deviceId).map(device => {
-                      const id = device.deviceId
-                      return (
-                        <option key={id} value={id}>
-                          {id}
-                        </option>
-                      )
-                    })}
-                  </Select> */}
-                  <Button colorScheme={!detecting ? "green" : "red"} onClick={!detecting ?  handleStartup : handleStopDetection} width="100%">
-                    {!detecting ? "Start Detection" : "STOP"}
-                  </Button>
-                </Stack>
               </Stack>
+              <Box p={3}>
+                <FormControl isRequired>
+                  <FormLabel>Plate number</FormLabel>
+                  <Input type='text' value={plateNumber} onChange={(e) => {
+                    setPlateNumber(e.target.value)
+                  }} />
+                </FormControl>
+                <Spacer height={3} />
+                <Button variant='solid' colorScheme='blue' onClick={handleSave} disabled={true}>
+                  Save plate number
+                </Button>
+              </Box>
+            </Box>
 
-              <Stack>
-                <CardBody>
-                  <Heading size='md'>Detections</Heading>
-                  <Text py='2'>
-                    Select a detection to save or input plate number if no detection is correct or found
-                  </Text>
-                  <Stack direction='row' wrap="wrap" spacing={4} align='center'>
-                    {detections.map((item, index) => (
-                      <Button key={index} display="flex" flexDirection="row" gap={2} colorScheme={item === plateNumber ? 'green' : 'gray'} onClick={() => setPlateNumber(item.text)}>
+            <Box py={3}>
+              <Heading size='md'>Detections</Heading>
+              <Text py='2'>
+                Select a detection to save or input plate number if no detection is correct or found
+              </Text>
+              <Grid gap={4} templateColumns='repeat(4, 1fr)'>
+                {detections.map((item, index) => (
+                  <Card>
+                    {/* <CardBody> */}
+                    <Image src={`data:image/jpg;base64, ${item.plateImage}`} />
+                    {/* </CardBody> */}
+                    <CardFooter flexDirection='column'>
+                      {/* <Box mb={2}>
+                        <Text>D={Number(item.detectionScore).toFixed(2)} R={Number(item.recognitionScore).toFixed(2)}</Text>
+                      </Box> */}
+                      <Button
+                        key={index}
+                        colorScheme={item === plateNumber ? 'green' : 'gray'}
+                        onClick={() => setPlateNumber(item.text)}
+                        width='100%'
+                      >
                         <Text>{item.text}</Text>
-                        <Text>D={Number(item.detectionScore).toFixed(2)}</Text>
-                        <Text>R={Number(item.recognitionScore).toFixed(2)}</Text>
                       </Button>
-                    ))}
-                  </Stack>
-                  <Spacer height={3} />
-                  <FormControl isRequired>
-                    <FormLabel>Plate number</FormLabel>
-                    <Input type='text' value={plateNumber} onChange={(e) => {
-                      setPlateNumber(e.target.value)
-                    }} />
-                  </FormControl>
-                  <Spacer height={3} />
-                  <Button variant='solid' colorScheme='blue' onClick={handleSave} disabled={true}>
-                    Save plate number
-                  </Button>
-                </CardBody>
-              </Stack>
-            </Grid>
-            
-          </Card>
+                    </CardFooter>
+                  </Card>
+
+                ))}
+              </Grid>
+            </Box>
+          </Grid>
         </Box>
+        <Spacer h={80}/>
+        {/* <iframe src="http://localhost:4200/cumulative-total" width={600} height={200} ></iframe> */}
+        <Spacer h={60}/>
       </Container>
     </>
   )
